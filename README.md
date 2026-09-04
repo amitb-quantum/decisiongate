@@ -79,6 +79,203 @@ decisiongate evaluate --provider openai --evidence requirements.pdf \
 
 The OpenAI adapter is optional. The provider boundary is generic, and the adjudicator applies the same deterministic rules to provider output. API keys belong in the environment; `.env` is ignored.
 
+## Using DecisionGate on a government opportunity
+
+A practical DARPA, SBIR/STTR, BAA, Broad Agency Announcement, Special Notice, or other federal opportunity usually begins with a simple question:
+
+> **Do the authoritative documents actually support the decision to spend time and money pursuing this opportunity?**
+
+DecisionGate treats that as an evidence problem rather than a writing problem.
+
+### 1. Collect the authoritative source material
+
+Provide the documents that define the opportunity. Depending on the program, that may include:
+
+- the solicitation, BAA, SBIR/STTR topic, Special Notice, or funding-opportunity PDF;
+- amendments and modifications;
+- official FAQ or Q&A documents;
+- eligibility and submission rules;
+- statements of objectives or technical-area descriptions;
+- official program presentations or other authoritative clarifications, if available.
+
+If you already have a concept paper, white paper, abstract, or proposal draft, provide that as evidence too. This lets DecisionGate evaluate not only what the government says, but also what you are proposing to do.
+
+Conceptually, the input is:
+
+```text
+government requirements
++
+your proposed work
++
+the decision you are considering
+```
+
+For example:
+
+```text
+Decision: Submit this white paper to this DARPA program.
+```
+
+or:
+
+```text
+Decision: Pursue this SBIR topic as the prime small-business applicant.
+```
+
+### 2. Run DecisionGate before substantial proposal writing
+
+For a DARPA-style opportunity:
+
+```bash
+decisiongate evaluate \
+  --provider openai \
+  --evidence DARPA_BAA.pdf \
+  --evidence DARPA_FAQ.pdf \
+  --evidence my_white_paper.pdf \
+  --decision "Submit this white paper to this DARPA program" \
+  --output build/darpa-review
+```
+
+For an SBIR/STTR opportunity:
+
+```bash
+decisiongate evaluate \
+  --provider openai \
+  --evidence sbir_topic.pdf \
+  --evidence sbir_eligibility.md \
+  --evidence concept.md \
+  --decision "Pursue this SBIR topic with this technical concept" \
+  --output build/sbir-review
+```
+
+The model-assisted path is useful for ordinary unstructured government documents because it can propose predicates, assumptions, and evidence relationships. The model still cannot promote its own interpretation into source evidence: the deterministic DecisionGate layer applies the same trust boundary and final gate rules.
+
+### 3. Read the report as a decision audit
+
+The report is intended to answer questions such as:
+
+- What does the solicitation explicitly say?
+- What does my proposal explicitly claim?
+- Which requirements clearly match?
+- Which conclusions are only inferred from wording similarity?
+- What hidden assumptions connect the opportunity to my proposed work?
+- What evidence supports those assumptions?
+- What evidence contradicts them?
+- Which critical predicates remain unresolved?
+- What single question could materially change the decision?
+
+Every run writes:
+
+```text
+decisiongate-report.json
+decisiongate-report.md
+```
+
+The Markdown report is the human-facing decision audit. The JSON report preserves the same result in machine-readable form.
+
+### 4. Example: apparent scope fit is not enough
+
+Suppose a government solicitation explicitly mentions **logical QCVV**, and your proposed project also concerns logical QCVV.
+
+A conventional LLM review can easily reason:
+
+```text
+Solicitation mentions logical QCVV
++
+proposal concerns logical QCVV
+=
+appears in scope
+```
+
+DecisionGate asks what must additionally be true for the submission decision to be justified.
+
+A critical predicate might be:
+
+```text
+Independent logical-QCVV methodology is eligible as a primary research objective under this program.
+```
+
+The available evidence may establish that logical QCVV is mentioned, while failing to establish whether the program accepts it as a standalone primary objective rather than only as a supporting activity inside another technical effort.
+
+That produces an unresolved assumption rather than a fabricated answer:
+
+```text
+Predicate:
+Independent logical-QCVV methodology is an eligible primary research topic.
+
+Evidence for:
+The solicitation explicitly discusses logical QCVV.
+
+Evidence against:
+None currently available.
+
+Hidden assumption:
+Mention of logical QCVV means it can be the primary standalone research objective.
+
+Status:
+UNRESOLVED
+
+Disposition:
+HUMAN_VERIFY
+```
+
+The report can then surface a decision-changing question such as:
+
+> Does the program accept independent logical-QCVV methodology as a primary research objective, or only QCVV conducted as part of a broader FTQC development effort?
+
+That question can be sent to the responsible Program Manager **before** substantial proposal effort is committed.
+
+The point is not that DecisionGate can read a Program Manager's undisclosed intent. It cannot. The point is that it should recognize when the available evidence does not justify pretending that intent is already known.
+
+### 5. `GO`, `NO_GO`, and `HUMAN_VERIFY` in this workflow
+
+For government opportunities:
+
+- **`GO`** means every critical predicate represented in the evidence graph is supported by independent evidence.
+- **`NO_GO`** means independent evidence refutes at least one critical predicate.
+- **`HUMAN_VERIFY`** means a consequential requirement, interpretation, dependency, or scope assumption remains unresolved.
+
+`HUMAN_VERIFY` often has the highest practical value early in a proposal process because it tells you exactly what must be clarified before investing heavily in drafting.
+
+### 6. Deterministic mode versus model-assisted mode
+
+DecisionGate supports two useful workflows.
+
+#### Deterministic / annotated mode
+
+For regression tests, reproducible evaluations, or highly controlled reviews, use explicit annotations:
+
+```text
+[PREDICATE scope_fit | CRITICAL] The proposed work is within the program's intended research scope.
+[FOR scope_fit | PRIMARY] The solicitation explicitly identifies logical QCVV as an area of interest.
+[QUESTION scope_fit] Does this permit logical QCVV as a standalone primary research objective?
+```
+
+This mode is highly auditable, but a human must supply the predicate/evidence structure.
+
+#### Model-assisted mode
+
+For a real 20-page, 50-page, or 100-page solicitation, use the optional provider:
+
+```bash
+decisiongate evaluate \
+  --provider openai \
+  --evidence solicitation.pdf \
+  --evidence proposal.pdf \
+  --decision "Submit this proposal to this research program" \
+  --output build/review
+```
+
+The model proposes the structure; the deterministic engine adjudicates it. Model consensus is not counted as independent corroboration.
+
+### 7. Important v0.1 limitation
+
+DecisionGate v0.1 analyzes the evidence corpus you supply. It does **not** yet retrieve external program history, prior awards, Program Manager presentations, procurement context, or web evidence automatically.
+
+If those materials matter to the decision, supply them explicitly as evidence. External retrieval with preserved provenance is a planned extension.
+
+This limitation is deliberate: v0.1 would rather return `HUMAN_VERIFY` than invent institutional context that is not present in the evidence corpus.
+
 ## Worked example
 
 An auditable offline evidence file can say:
