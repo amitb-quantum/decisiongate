@@ -11,20 +11,27 @@ from typing import Any
 def _openai_strict_schema(json_schema: dict[str, Any]) -> dict[str, Any]:
     """Convert ordinary JSON Schema into the strict subset used by OpenAI.
 
-    Pydantic schemas are valid JSON Schema but may omit ``additionalProperties``
-    and may leave fields with defaults out of ``required``. OpenAI Structured
-    Outputs with ``strict=True`` requires object schemas to reject extra fields
-    and expects every declared property to be required (nullable fields remain
-    expressible through their type schema).
+    Pydantic schemas are valid JSON Schema but may omit ``additionalProperties``,
+    may leave fields with defaults out of ``required``, and may attach ``default``
+    next to ``$ref``. OpenAI Structured Outputs with ``strict=True`` requires
+    object schemas to reject extra fields, expects every declared property to be
+    required, and rejects ``default`` in the structured-output schema (including
+    as a sibling of ``$ref``).
 
     The conversion is provider-local so DecisionGate's core Pydantic models do
-    not need OpenAI-specific validation semantics.
+    not need OpenAI-specific validation semantics. Pydantic still applies model
+    defaults when validating provider payloads outside this wire schema.
     """
 
     schema = deepcopy(json_schema)
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
+            # Defaults describe Python-side model behavior, not the shape the
+            # model must emit. They are unsupported by OpenAI strict schemas and
+            # can also make an otherwise-valid $ref node fail validation.
+            node.pop("default", None)
+
             properties = node.get("properties")
             if node.get("type") == "object" or isinstance(properties, dict):
                 node["additionalProperties"] = False
