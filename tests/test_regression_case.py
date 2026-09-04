@@ -33,3 +33,18 @@ def test_quantumeagle_scope_regression_returns_human_verify(tmp_path: Path) -> N
     assert "# DecisionGate Report" in rendered
     assert "## Provenance" in rendered
 
+
+def test_database_scaling_regression_returns_human_verify() -> None:
+    case_path = ROOT / "cases" / "database_scaling" / "case.json"
+    case = json.loads(case_path.read_text(encoding="utf-8"))
+    evidence = [case_path.parent / item for item in case["evidence"]]
+    report = DecisionGate().evaluate(evidence, case["decision"])
+
+    assert report.disposition == Disposition.HUMAN_VERIFY
+    predicates = {predicate.predicate_id: predicate for predicate in report.predicates}
+    assert predicates["measured_benchmark_advantage"].status == "SUPPORTED"
+    assert predicates["production_scale_fit"].status == "UNRESOLVED"
+    assert report.decision_changing_questions == [
+        "Has Database B been benchmarked under production-representative scale and workload conditions?"
+    ]
+    assert "shrink, disappear, or reverse" in report.falsification_tests[0].inverted_hypothesis

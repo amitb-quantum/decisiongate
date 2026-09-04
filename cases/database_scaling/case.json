@@ -1,0 +1,5 @@
+{
+  "decision": "Adopt Database B because the supplied benchmark shows it is 35% faster than Database A",
+  "evidence": ["evidence.md"]
+}
+
