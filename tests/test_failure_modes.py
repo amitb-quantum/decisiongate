@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from decisiongate.engine import DecisionGate
+from decisiongate.extractor import extract_claims, read_document
 from decisiongate.models import Disposition, PredicateStatus
 from decisiongate.providers.deterministic import DeterministicProvider
 
@@ -97,6 +98,72 @@ def test_provider_cannot_invent_evidence_claim_ids(tmp_path: Path) -> None:
     assert report.disposition == Disposition.HUMAN_VERIFY
 
 
+def test_provider_proposed_support_link_cannot_authorize_go(tmp_path: Path) -> None:
+    evidence = tmp_path / "source.md"
+    evidence.write_text("The official register lists the applicant as eligible.\n", encoding="utf-8")
+    claims = extract_claims(read_document(evidence))
+    provider = DeterministicProvider(
+        {
+            "compile_analysis": [
+                {
+                    "predicates": [
+                        {
+                            "predicate_id": "eligibility",
+                            "statement": "The applicant is eligible.",
+                            "critical": True,
+                            "evidence_for": [claims[0].claim_id],
+                            "unresolved_questions": [
+                                "Does the authoritative eligibility rule apply to this applicant?"
+                            ],
+                        }
+                    ],
+                    "assumptions": [],
+                }
+            ]
+        }
+    )
+
+    report = DecisionGate(provider=provider).evaluate([evidence], "Submit the application")
+
+    assert report.disposition == Disposition.HUMAN_VERIFY
+    assert report.predicates[0].status == PredicateStatus.UNRESOLVED
+    assert any("model-proposed" in warning.lower() for warning in report.warnings)
+
+
+def test_provider_proposed_refutation_link_cannot_authorize_no_go(tmp_path: Path) -> None:
+    evidence = tmp_path / "source.md"
+    evidence.write_text("No production-scale benchmark is available.\n", encoding="utf-8")
+    claims = extract_claims(read_document(evidence))
+    provider = DeterministicProvider(
+        {
+            "compile_analysis": [
+                {
+                    "predicates": [
+                        {
+                            "predicate_id": "scale_fit",
+                            "statement": "Small-scale performance generalizes to production scale.",
+                            "critical": True,
+                            "evidence_against": [claims[0].claim_id],
+                            "unresolved_questions": [
+                                "Has performance been tested at production-representative scale?"
+                            ],
+                        }
+                    ],
+                    "assumptions": [],
+                }
+            ]
+        }
+    )
+
+    report = DecisionGate(provider=provider).evaluate([evidence], "Adopt Database B")
+
+    assert report.disposition == Disposition.HUMAN_VERIFY
+    assert report.predicates[0].status == PredicateStatus.UNRESOLVED
+    assert report.decision_changing_questions == [
+        "Has performance been tested at production-representative scale?"
+    ]
+
+
 def test_model_consensus_is_not_independent_evidence(tmp_path: Path) -> None:
     report = evaluate(
         tmp_path,
@@ -137,4 +204,3 @@ def test_empty_decision_and_evidence_are_rejected(tmp_path: Path) -> None:
         DecisionGate().evaluate([source], "")
     with pytest.raises(ValueError, match="evidence"):
         DecisionGate().evaluate([], "Act")
-
