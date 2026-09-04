@@ -33,12 +33,19 @@ class DecisionGate:
             raise ValueError("At least one evidence document is required")
         documents = [read_document(Path(path)) for path in evidence_paths]
         claims = [claim for document in documents for claim in extract_claims(document)]
+        provider_assisted = self.provider is not None
         draft = (
             model_assisted_analysis(self.provider, claims, decision)
-            if self.provider
+            if provider_assisted
             else deterministic_analysis(documents, claims, decision)
         )
-        return self.adjudicate(decision, claims, draft.predicates, draft.assumptions)
+        return self.adjudicate(
+            decision,
+            claims,
+            draft.predicates,
+            draft.assumptions,
+            evidence_links_trusted=not provider_assisted,
+        )
 
     @staticmethod
     def adjudicate(
@@ -46,11 +53,18 @@ class DecisionGate:
         claims: list[Claim],
         predicates: list[Predicate],
         assumptions: list[Assumption] | None = None,
+        *,
+        evidence_links_trusted: bool = True,
     ) -> DecisionReport:
         assumptions = assumptions or []
         claim_map = {claim.claim_id: claim for claim in claims}
         warnings: list[str] = []
         contradictions: list[Contradiction] = []
+
+        if not evidence_links_trusted:
+            warnings.append(
+                "Model-proposed claim-to-predicate links are interpretive and were not treated as independently verified evidence relations."
+            )
 
         for predicate in predicates:
             missing = [
@@ -64,10 +78,24 @@ class DecisionGate:
                 )
             predicate.evidence_for = [cid for cid in predicate.evidence_for if cid in claim_map]
             predicate.evidence_against = [cid for cid in predicate.evidence_against if cid in claim_map]
-            independent_for = [cid for cid in predicate.evidence_for if claim_map[cid].is_independent_evidence]
-            independent_against = [
-                cid for cid in predicate.evidence_against if claim_map[cid].is_independent_evidence
-            ]
+
+            if evidence_links_trusted:
+                independent_for = [
+                    cid for cid in predicate.evidence_for if claim_map[cid].is_independent_evidence
+                ]
+                independent_against = [
+                    cid
+                    for cid in predicate.evidence_against
+                    if claim_map[cid].is_independent_evidence
+                ]
+            else:
+                # The underlying claims may be authoritative, but the relation
+                # "claim X supports/refutes predicate Y" was proposed by a model.
+                # That semantic link is itself an interpretation and therefore
+                # cannot independently authorize GO or NO_GO.
+                independent_for = []
+                independent_against = []
+
             if independent_for and independent_against:
                 predicate.status = PredicateStatus.UNRESOLVED
                 predicate.confidence = 0.25
@@ -90,16 +118,26 @@ class DecisionGate:
                 predicate.rationale = "Independent evidence supports this predicate."
             else:
                 predicate.status = PredicateStatus.UNRESOLVED
-                predicate.confidence = 0.2 if predicate.evidence_for else 0.0
-                predicate.rationale = (
-                    "Only inference, assumption, or model interpretation supports this predicate."
-                    if predicate.evidence_for
-                    else "No independent evidence resolves this predicate."
-                )
-                if predicate.evidence_for:
-                    warnings.append(
-                        f"Consensus/interpretation for {predicate.predicate_id} was not counted as independent evidence."
+                predicate.confidence = 0.2 if predicate.evidence_for or predicate.evidence_against else 0.0
+                if not evidence_links_trusted and (
+                    predicate.evidence_for or predicate.evidence_against
+                ):
+                    predicate.rationale = (
+                        "The cited claims exist, but their support/refutation relationship to this predicate was model-proposed and remains unverified."
                     )
+                    warnings.append(
+                        f"Model-proposed evidence relation for {predicate.predicate_id} was not counted as independent adjudicative evidence."
+                    )
+                else:
+                    predicate.rationale = (
+                        "Only inference, assumption, or model interpretation supports this predicate."
+                        if predicate.evidence_for
+                        else "No independent evidence resolves this predicate."
+                    )
+                    if predicate.evidence_for:
+                        warnings.append(
+                            f"Consensus/interpretation for {predicate.predicate_id} was not counted as independent evidence."
+                        )
 
         critical = [p for p in predicates if p.critical and p.status != PredicateStatus.NOT_APPLICABLE]
         if any(p.status == PredicateStatus.REFUTED for p in critical):
