@@ -2,15 +2,17 @@
 
 > **DecisionGate — a falsification-first adjudication framework for LLM-assisted decisions.**
 
+DecisionGate is a falsification-first adjudication framework for LLM-assisted decisions. It is a small, inspectable Python engine and CLI that keeps evidence separate from the interpretations built on top of it.
+
+Multiple LLMs can agree on a convincing conclusion while sharing the same unsupported assumption. Agreement is not independent evidence. Repeating an interpretation does not turn it into a fact.
+
 DecisionGate does not ask whether an AI can construct a convincing argument for a decision. It asks whether the assumptions required by that decision have survived an explicit attempt to falsify them.
 
-It is a small, inspectable Python engine and CLI for decisions such as proposal fit, architecture selection, investment theses, hiring, scientific hypotheses, vendor selection, security, compliance, and agent actions.
+DecisionGate does not try to guarantee that a decision is correct. It tries to prevent an LLM-assisted reasoning process from treating unresolved assumptions as established evidence.
 
-## The problem
+## What it does differently
 
-Several frontier models can read the same material, independently produce persuasive reviews, and converge on the same wrong conclusion. Agreement is not necessarily independent validation: the models may share training data, framing, missing context, or the same unstated assumption. Repeating an interpretation does not turn it into evidence.
-
-DecisionGate therefore separates:
+For a proposed decision, DecisionGate separates:
 
 - **EXPLICIT** — a supplied source says this (which is not the same as proving it true)
 - **INFERENCE** — reasoning supported by evidence but not stated by it
@@ -20,9 +22,22 @@ DecisionGate therefore separates:
 
 Each claim retains its source, location, evidence class, provenance class, evidence tier, and confidence. Model output is `MODEL_INFERENCE`; it cannot create `SOURCE_EVIDENCE`.
 
-## Falsification first
+The analysis identifies the predicates that must hold, exposes assumptions connecting evidence to the proposed decision, constructs plausible inversions of favorable assumptions, and asks what evidence would distinguish the competing interpretations.
 
-The engine compiles the decision into predicates, links existing evidence to each predicate, exposes assumptions, inverts each favorable assumption, and asks what evidence would distinguish the favorable and unfavorable interpretations. The final gate is deterministic:
+```text
+evidence
+→ plausible interpretation
+→ hidden assumption
+→ falsification attempt
+→ predicate resolved or unresolved
+→ GO / NO_GO / HUMAN_VERIFY
+```
+
+## Why `HUMAN_VERIFY` matters
+
+`HUMAN_VERIFY` is the intended result when a consequential predicate cannot be resolved from available independent evidence. It is not a generic refusal and it is not evidence against the decision. It identifies the smallest questions that a human or authoritative source must answer before the gate can safely move to `GO` or `NO_GO`.
+
+The final gate is deterministic:
 
 - `NO_GO` when independent evidence refutes any critical predicate
 - `HUMAN_VERIFY` when any critical predicate is unresolved or contradicted
@@ -38,15 +53,16 @@ conda activate decisiongate
 python -m pip install -e '.[dev]'
 pytest
 decisiongate evaluate --case cases/quantumeagle_scope/case.json --output build/quantumeagle
+decisiongate evaluate --case cases/database_scaling/case.json --output build/database-scaling
 ```
 
 Or evaluate files directly:
 
 ```bash
 decisiongate evaluate \
-  --evidence evidence/requirements.pdf \
-  --evidence evidence/proposal.pdf \
-  --decision "Submit this proposal to this research program" \
+  --evidence evidence/benchmark.pdf \
+  --evidence evidence/production-workload.md \
+  --decision "Adopt Database B" \
   --output build/report
 ```
 
@@ -83,7 +99,23 @@ Now replace the supporting line with:
 
 That result is `HUMAN_VERIFY`: three model opinions still provide no independent evidence that the review occurred.
 
-See [docs/annotation-format.md](docs/annotation-format.md) and the checked-in [QuantumEagle regression case](cases/quantumeagle_scope/README.md).
+See [docs/annotation-format.md](docs/annotation-format.md) for the complete deterministic input format.
+
+## Two domains, the same failure pattern
+
+### Government-program scope
+
+The applicant saw apparent textual fit, and several LLM-assisted reviews supported submission. Whether the topic was eligible as an independent primary research objective remained unresolved.
+
+**Result: `HUMAN_VERIFY`** — ask the responsible authority to resolve the program-scope interpretation before submitting. See the [QuantumEagle scope case](cases/quantumeagle_scope/README.md).
+
+### Database scaling
+
+A supplied benchmark measured Database B as 35% faster than Database A at approximately 10,000 records. Production may reach approximately 50 million records, and no production-representative benchmark is available. The favorable decision therefore depends on an unresolved scalability assumption.
+
+**Result: `HUMAN_VERIFY`** — benchmark Database B under production-representative scale and workload conditions. See the [database scaling case](cases/database_scaling/README.md).
+
+Neither result claims that the proposed action is wrong. Both expose the same epistemic failure pattern: favorable evidence supports a plausible interpretation, but a decision-critical assumption has not survived falsification.
 
 ## Outputs
 
@@ -105,7 +137,7 @@ The implementation is intentionally explicit:
 5. deterministic gate rules select the disposition;
 6. renderers produce JSON and Markdown with provenance.
 
-The proponent and challenger views are projections over the same evidence graph. They cannot win by eloquence, and their agreement is never counted as corroboration. See [docs/architecture.md](docs/architecture.md).
+The proponent and challenger views are projections over the same evidence graph. Their prose does not affect the gate, and their agreement is not counted as corroboration. See [docs/architecture.md](docs/architecture.md).
 
 ## Current limitations
 
@@ -115,6 +147,7 @@ The proponent and challenger views are projections over the same evidence graph.
 - Evidence authority is declared by the input annotation or provider proposal and still requires human scrutiny.
 - External retrieval is a future extension point; v0.1 never invents or fetches external facts.
 - The system identifies evidence insufficiency. It cannot discover a decision-maker's undisclosed intent.
+- DecisionGate does not establish truth from insufficient evidence or replace accountable human judgment.
 
 ## Roadmap
 
@@ -133,4 +166,3 @@ pytest
 ```
 
 DecisionGate is licensed under Apache-2.0. Contributions should preserve the central trust boundary: interpretations may organize evidence, but they may not become evidence.
-

@@ -1,4 +1,4 @@
-"""Compile deterministic annotations or isolated model proposals into analysis."""
+"""Compile deterministic annotations or isolated model-produced structure into analysis."""
 
 from __future__ import annotations
 

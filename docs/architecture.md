@@ -6,7 +6,7 @@ DecisionGate v0.1 uses an explicit pipeline so its epistemic behavior can be ins
 local documents
       |
       v
-claim extraction -----> immutable IDs + provenance + source location
+claim extraction -----> stable IDs + provenance + source location
       |                                  |
       v                                  |
 predicate/assumption compilation         |
@@ -47,4 +47,3 @@ The gate then applies a small truth table. Any refuted critical predicate yields
 `ModelProvider.complete_json` is the only provider-specific boundary. `DeterministicProvider` queues fixed responses for network-free tests. `OpenAIProvider` is an optional adapter. Future adapters can implement the protocol without changing the engine.
 
 The v0.1 provider call compiles analysis in one isolated request with no conversation history. Separate proponent and challenger calls can be added later, but the final arbiter must remain evidence-based.
-
