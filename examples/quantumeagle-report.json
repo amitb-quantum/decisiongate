@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0",
+  "decision": "Submit the proposed research project to the program",
+  "disposition": "HUMAN_VERIFY",
+  "confidence": 0.0,
+  "confidence_basis": "Confidence is bounded by the weakest critical predicate; unresolved predicates force 0.0.",
+  "claims": [
+    {
+      "claim_id": "claim-3cbc64e01c",
+      "text": "Apparent textual alignment is sufficient to show that the proposed topic is eligible as an independent primary research objective.",
+      "source": "predecision_evidence.md",
+      "source_location": "line 5",
+      "evidence_type": "ASSUMPTION",
+      "provenance": "USER_ASSUMPTION",
+      "tier": "UNSUPPORTED_SPECULATION",
+      "confidence": 0.5
+    },
+    {
+      "claim_id": "claim-9dfc7f97c7",
+      "text": "Several LLM-assisted reviews supported the applicant's interpretation and recommended submission.",
+      "source": "predecision_evidence.md",
+      "source_location": "line 9",
+      "evidence_type": "EXPLICIT",
+      "provenance": "SOURCE_EVIDENCE",
+      "tier": "MODEL_INTERPRETATION",
+      "confidence": 1.0
+    }
+  ],
+  "predicates": [
+    {
+      "predicate_id": "semantic_scope_fit",
+      "statement": "The proposed research topic is eligible as a primary research objective under the program's intended scope.",
+      "critical": true,
+      "evidence_for": [
+        "claim-9dfc7f97c7"
+      ],
+      "evidence_against": [],
+      "unresolved_questions": [
+        "Does the program consider the proposed topic eligible as an independent primary research objective, or only when it supports another program objective?"
+      ],
+      "status": "UNRESOLVED",
+      "confidence": 0.2,
+      "rationale": "Only inference, assumption, or model interpretation supports this predicate."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "assumption-1",
+      "text": "Apparent textual alignment is sufficient to show that the proposed topic is eligible as an independent primary research objective.",
+      "predicate_id": "semantic_scope_fit",
+      "consequence": "The decision may fail if semantic_scope_fit is false.",
+      "provenance": "USER_ASSUMPTION",
+      "confidence": 0.5,
+      "inverted_hypothesis": "The referenced topic may be permitted only as a supporting capability attached to another program objective, not as an independent primary research objective.",
+      "distinguishing_evidence": "Does the program consider the proposed topic eligible as an independent primary research objective, or only when it supports another program objective?"
+    }
+  ],
+  "falsification_tests": [
+    {
+      "assumption_id": "assumption-1",
+      "favorable_hypothesis": "Apparent textual alignment is sufficient to show that the proposed topic is eligible as an independent primary research objective.",
+      "inverted_hypothesis": "The referenced topic may be permitted only as a supporting capability attached to another program objective, not as an independent primary research objective.",
+      "distinguishing_evidence": "Does the program consider the proposed topic eligible as an independent primary research objective, or only when it supports another program objective?",
+      "result": "UNRESOLVED"
+    }
+  ],
+  "proponent": {
+    "position": "FOR",
+    "propositions": [
+      "The proposed research topic is eligible as a primary research objective under the program's intended scope."
+    ],
+    "evidence_claim_ids": [
+      "claim-9dfc7f97c7"
+    ],
+    "caveats": [
+      "Only inference, assumption, or model interpretation supports this predicate."
+    ]
+  },
+  "challenger": {
+    "position": "AGAINST",
+    "propositions": [
+      "The predicate may be false: The proposed research topic is eligible as a primary research objective under the program's intended scope."
+    ],
+    "evidence_claim_ids": [],
+    "caveats": [
+      "Absence of evidence is not affirmative evidence against a predicate."
+    ]
+  },
+  "contradictions": [],
+  "decision_changing_questions": [
+    "Does the program consider the proposed topic eligible as an independent primary research objective, or only when it supports another program objective?"
+  ],
+  "final_adjudication": "One or more critical predicates remain unresolved; obtain authoritative evidence before acting.",
+  "warnings": [
+    "Consensus/interpretation for semantic_scope_fit was not counted as independent evidence."
+  ]
+}
