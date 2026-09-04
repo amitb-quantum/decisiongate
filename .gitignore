@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.venv/
+.env
+.idea/
+.vscode/
+decisiongate-report.json
+decisiongate-report.md
+
