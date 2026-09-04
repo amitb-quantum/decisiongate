@@ -4,7 +4,40 @@ from __future__ import annotations
 
 import json
 import os
+from copy import deepcopy
 from typing import Any
+
+
+def _openai_strict_schema(json_schema: dict[str, Any]) -> dict[str, Any]:
+    """Convert ordinary JSON Schema into the strict subset used by OpenAI.
+
+    Pydantic schemas are valid JSON Schema but may omit ``additionalProperties``
+    and may leave fields with defaults out of ``required``. OpenAI Structured
+    Outputs with ``strict=True`` requires object schemas to reject extra fields
+    and expects every declared property to be required (nullable fields remain
+    expressible through their type schema).
+
+    The conversion is provider-local so DecisionGate's core Pydantic models do
+    not need OpenAI-specific validation semantics.
+    """
+
+    schema = deepcopy(json_schema)
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if node.get("type") == "object" or isinstance(properties, dict):
+                node["additionalProperties"] = False
+                if isinstance(properties, dict):
+                    node["required"] = list(properties.keys())
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
+    return schema
 
 
 class OpenAIProvider:
@@ -33,9 +66,8 @@ class OpenAIProvider:
                     "type": "json_schema",
                     "name": purpose,
                     "strict": True,
-                    "schema": json_schema,
+                    "schema": _openai_strict_schema(json_schema),
                 }
             },
         )
         return json.loads(response.output_text)
-
